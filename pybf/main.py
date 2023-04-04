@@ -31,6 +31,7 @@ class Brainfuck:
         self._data_pointer = 0
         self._instruction_pointer = 0
         self._array = [0]
+        self.output = ""
 
     def run(self) -> str:
         start: list[int] = []
@@ -62,7 +63,7 @@ class Brainfuck:
                     else:
                         self._instruction_pointer = start[-1]
                 case _:
-                    logger.debug("Unknown character: %r", char)
+                    pass
 
             self._instruction_pointer += 1
         return self.output

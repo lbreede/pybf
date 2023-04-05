@@ -39,7 +39,7 @@ class Brainfuck:
             with open(file, encoding="utf-8") as fp:
                 self.program = fp.read()
                 return self.program
-        raise FileNotFoundError("")
+        raise FileNotFoundError(f"File {file} not found.")
 
     def reset(self, include_output: bool = False) -> None:
         """Resets all values and optionally also the output"""
@@ -110,11 +110,18 @@ class Brainfuck:
         self._array[self.data_pointer] = self._input_buffer.pop(0)
 
     def _start_loop(self) -> None:
-        """Start loop."""
+        """If the start of a loop is reached, append its position to the loop_starts
+        list.
+        """
         self._loop_starts.append(self.instruction_pointer)
 
     def _end_loop(self) -> None:
-        """End loop."""
+        """Once the end of a loop is reached, check if the value at the data pointer is
+        0.
+        If it is, pop the last loop start from the loop_starts list and continue with
+        the next instruction.
+        Else, set the instruction pointer to the last loop start.
+        """
         if self._array[self.data_pointer] == 0:
             self._loop_starts.pop()
         else:

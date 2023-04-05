@@ -1,8 +1,9 @@
 import logging
+import os
 from pathlib import Path
 
 logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -15,92 +16,138 @@ class Brainfuck:
     MAX_VALUE = 256
 
     def __init__(self):
-        self._data_pointer: int = 0
-        self._instruction_pointer: int = 0
+        self.data_pointer: int = 0
+        self.instruction_pointer: int = 0
         self._array: list[int] = [0]
         self.program: str = ""
         self.output: str = ""
         self._input_buffer: list[int] = []
+        self._loop_starts: list[int] = []
+        self._operations = {
+            ">": self._increment_data_pointer,
+            "<": self._decrement_data_pointer,
+            "+": self._increment_value_at_pointer,
+            "-": self._decrement_value_at_pointer,
+            ".": self._output_value,
+            ",": self._input_value,
+            "[": self._start_loop,
+            "]": self._end_loop,
+        }
 
     def load(self, file: FileDescriptorOrPath) -> str:
-        with open(file, encoding="utf-8") as fp:
-            self.program = fp.read()
-            return self.program
+        if os.path.exists(file):
+            with open(file, encoding="utf-8") as fp:
+                self.program = fp.read()
+                return self.program
+        raise FileNotFoundError("")
 
-    def reset(self) -> None:
-        self._data_pointer = 0
-        self._instruction_pointer = 0
+    def reset(self, include_output: bool = False) -> None:
+        """Resets all values and optionally also the output"""
+        self.data_pointer = 0
+        self.instruction_pointer = 0
         self._array = [0]
-        self.output = ""
+        self._loop_starts = []
+        self._input_buffer = []
+        if include_output:
+            self.output = ""
 
     def run(self) -> str:
-        start: list[int] = []
+        """Run the program and return the output."""
+        while self.instruction_pointer < len(self.program):
+            char = self.program[self.instruction_pointer]
 
-        while self._instruction_pointer < len(self.program):
-            char = self.program[self._instruction_pointer]
+            if char in self._operations:
+                self._operations[char]()
+            else:
+                pass
 
-            match char:
-                case ">":
-                    self._increment_data_pointer()
-                case "<":
-                    self._decrement_data_pointer()
-                case "+":
-                    self._increment_value()
-                case "-":
-                    self._decrement_value()
-                case ".":
-                    self._output_value()
-                case ",":
-                    if not self._input_buffer:
-                        input_str = input()
-                        self._input_buffer = [ord(c) for c in input_str]
-                    self._array[self._data_pointer] = self._input_buffer.pop(0)
-                case "[":
-                    start.append(self._instruction_pointer)
-                case "]":
-                    if self._array[self._data_pointer] == 0:
-                        start.pop()
-                    else:
-                        self._instruction_pointer = start[-1]
-                case _:
-                    pass
-
-            self._instruction_pointer += 1
+            self.instruction_pointer += 1
         return self.output
 
     def _increment_data_pointer(self) -> None:
         """Increment the data pointer (to point to the next cell to the right)."""
-        self._data_pointer = min(self._data_pointer + 1, self.MAX_ARRAY_LENGTH - 1)
-        if self._data_pointer == len(self._array):
+        logger.debug(
+            "Incrementing data pointer from %s to %s",
+            self.data_pointer,
+            self.data_pointer + 1,
+        )
+        self.data_pointer = min(self.data_pointer + 1, self.MAX_ARRAY_LENGTH - 1)
+        if self.data_pointer == len(self._array):
             self._array.append(0)
 
     def _decrement_data_pointer(self) -> None:
         """Decrement the data pointer (to point to the next cell to the left)."""
-        self._data_pointer = max(self._data_pointer - 1, 0)
+        logger.debug(
+            "Decrementing data pointer from %s to %s",
+            self.data_pointer,
+            self.data_pointer - 1,
+        )
+        self.data_pointer = max(self.data_pointer - 1, 0)
 
-    def _increment_value(self) -> None:
-        """Increment the value at the data pointer."""
-        self._array[self._data_pointer] = min(
-            self._array[self._data_pointer] + 1, self.MAX_VALUE - 1
+    def _increment_value_at_pointer(self) -> None:
+        """Increment (increase by one) the byte at the data pointer."""
+        logger.debug("Incrementing value at pointer %s", self.data_pointer)
+        self._array[self.data_pointer] = min(
+            self._array[self.data_pointer] + 1, self.MAX_VALUE - 1
         )
 
-    def _decrement_value(self) -> None:
-        """Decrement the value at the data pointer."""
-        self._array[self._data_pointer] = max(self._array[self._data_pointer] - 1, 0)
+    def _decrement_value_at_pointer(self) -> None:
+        """Decrement (decrease by one) the byte at the data pointer."""
+        logger.debug("Decrementing value at pointer %s", self.data_pointer)
+        self._array[self.data_pointer] = max(self._array[self.data_pointer] - 1, 0)
 
     def _output_value(self) -> None:
         """Output the value at the data pointer."""
-        self.output += chr(self._array[self._data_pointer])
+        char = chr(self._array[self.data_pointer])
+        logger.debug("Outputting value at pointer %s: %s", self.data_pointer, char)
+        self.output += char
+
+    def _input_value(self) -> None:
+        """Accept one byte of input, storing its value in the byte at the data pointer."""
+        if not self._input_buffer:
+            input_str = input()
+            self._input_buffer = [ord(c) for c in input_str]
+        self._array[self.data_pointer] = self._input_buffer.pop(0)
+
+    def _start_loop(self) -> None:
+        """Start loop."""
+        self._loop_starts.append(self.instruction_pointer)
+
+    def _end_loop(self) -> None:
+        """End loop."""
+        if self._array[self.data_pointer] == 0:
+            self._loop_starts.pop()
+        else:
+            self.instruction_pointer = self._loop_starts[-1]
 
 
 def main() -> None:
-    import os
+    # import os
 
     bf = Brainfuck()
-    path = os.path.join(os.path.dirname(__file__), "..", "bf_files", "hello_world.bf")
-    bf.load(path)
+    # path = os.path.join(os.path.dirname(__file__), "..", "bf_files", "hello_world.bf")
+    # bf.load(path)
 
+    program = ">++++++++[<+++++++++>-]<.>++++[<+++++++>-]<+.+++++++..+++.>>++++++[<+++++++>-]<++.------------.>++++++[<+++++++++>-]<+.<.+++.------.--------.>>>++++[<++++++++>-]<+."
+    program_half_length = len(program) // 2
+    program_a = program[:program_half_length]
+    program_b = program[program_half_length:]
+
+    # print(program)
+    # print(program_a)
+    # print(program_b)
+
+    bf.program = program_a
     bf.run()
+
+    print(bf.program)
+    print(bf.output)
+
+    bf.program = program_b
+    bf.instruction_pointer = 0
+    bf.run()
+
+    print(bf.program)
     print(bf.output)
 
 

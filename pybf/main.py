@@ -126,37 +126,3 @@ class Brainfuck:
             self._loop_starts.pop()
         else:
             self.instruction_pointer = self._loop_starts[-1]
-
-
-def main() -> None:
-    # import os
-
-    bf = Brainfuck()
-    # path = os.path.join(os.path.dirname(__file__), "..", "bf_files", "hello_world.bf")
-    # bf.load(path)
-
-    program = ">++++++++[<+++++++++>-]<.>++++[<+++++++>-]<+.+++++++..+++.>>++++++[<+++++++>-]<++.------------.>++++++[<+++++++++>-]<+.<.+++.------.--------.>>>++++[<++++++++>-]<+."
-    program_half_length = len(program) // 2
-    program_a = program[:program_half_length]
-    program_b = program[program_half_length:]
-
-    # print(program)
-    # print(program_a)
-    # print(program_b)
-
-    bf.program = program_a
-    bf.run()
-
-    print(bf.program)
-    print(bf.output)
-
-    bf.program = program_b
-    bf.instruction_pointer = 0
-    bf.run()
-
-    print(bf.program)
-    print(bf.output)
-
-
-if __name__ == "__main__":
-    main()
